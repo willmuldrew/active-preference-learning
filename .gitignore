@@ -1,0 +1,4 @@
+venv
+wandb
+__pycache__
+.idea
