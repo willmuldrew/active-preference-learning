@@ -27,4 +27,4 @@ Needs auth for W&B and OpenAI (with GPT-4 access) - keys in home directory
 
 Infrastructure
 ----
-Larger experiments require 80GB A100 or H100 (for now)
+Larger experiments require 80GB A100 or H100 (for now) - mainly on Runpod, also on Lambdalabs.  Some home runs on a 24GB 4090
