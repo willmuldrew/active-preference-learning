@@ -13,6 +13,7 @@ from torch.utils.data import Subset, Dataset
 
 import direct.dpo_trainer
 import direct.generate
+import direct.model
 import direct.ppo_trainer
 from direct import utils as utils
 from direct.config import ExperimentConfig
@@ -20,8 +21,6 @@ from direct.data import load_prompt_dataset
 from direct.evaluate import evaluate_model
 from direct.model import get_generative_model
 from direct.oracles import get_preference_oracle
-
-from direct.experiments.experiment4 import compute_model_uncertainty
 
 
 def random_subset(dataset: Dataset, size: int):
@@ -167,12 +166,7 @@ def simple_training_loop(
                                         f"evaluation_m{len(training_data)}_step-{step}_endepoch-{epoch}"))
 
             if early_stopper.should_stop():
-                stop = True
                 break
-
-    def write_checkpoint(output_dir):
-        print(f"Writing gen_model to {output_dir}")
-        gen_model.save_pretrained(output_dir)
 
     i_prompt_dataloader = iter(itertools.cycle(prompt_dataloader))
 
@@ -336,7 +330,6 @@ def simple_training_loop(
                 test_prompt_dataset,
                 preference_oracle,
                 config,
-                include_samples=True,
                 sample_temperature=t,
                 prefix=f"{prefix}/eval_T{t:0.2f}",
                 vs_model=gen_trainer.ref_model if config.eval.vs_ref_model_eval else None,
@@ -395,3 +388,36 @@ def simple_training_loop(
         #     checkpoint_dir = os.path.join(wandb.run.dir, f"checkpoint_final_m{m}")
         #     write_checkpoint(checkpoint_dir)
 
+
+@torch.no_grad()
+def compute_model_uncertainty(gen_model, gen_ref_model, tokenizer, pairs, beta, batch_size, device):
+    all_scores = []
+    rhats = []
+    batch_size = min(batch_size, len(pairs))
+    for b in range(len(pairs) // batch_size):
+        pair_batch = pairs[b * batch_size:(b + 1) * batch_size]
+
+        col_pairs = utils.tensor_cols_to(utils.records_to_cols(pair_batch), device)
+
+        def fwd_pass(response_tokens):
+            return direct.model.batch_forward_pass(
+                gen_model, gen_ref_model, tokenizer,
+                col_pairs["prompt_tokens"], response_tokens,
+            )
+
+        logprobs_a, response_mask_a, ref_logprobs_a = fwd_pass(col_pairs["completion_tokens_0"])
+        logprobs_b, response_mask_b, ref_logprobs_b = fwd_pass(col_pairs["completion_tokens_1"])
+
+        r_a = beta * ((logprobs_a * response_mask_a).sum(dim=1) - (ref_logprobs_a * response_mask_a).sum(dim=1))
+        r_b = beta * ((logprobs_b * response_mask_b).sum(dim=1) - (ref_logprobs_b * response_mask_b).sum(dim=1))
+
+        # This expression is just to try and have a symmetric curve that is 1.0 when r_a == r_b, and tails off as
+        # abs(r_a - r_b) increases.  However... it results in the exact same ranking as abs(r_a - r_b)
+        u = 1.0 - 2.0 * torch.abs(torch.sigmoid(r_a - r_b) - 0.5)
+
+        for n, p in enumerate(pair_batch):
+            rhats.append([r_a[n].item(), r_b[n].item()])
+
+        all_scores.append(u)
+
+    return torch.cat(all_scores).tolist(), rhats

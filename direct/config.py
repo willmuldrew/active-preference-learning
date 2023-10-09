@@ -10,15 +10,6 @@ class DPOConfig(object):
     beta: float = 0.1
     acquisition_filter: str = "none"  # rm-rank, gm-rank
     oversample_factor: int = 1
-    # target_kl: Optional[float] = None # This doesn't seem to work - kl breaks in my experiments and drops (often -ve)
-
-
-# # Could use code like this to create a surrogate PPOConfig we can configure
-# # from the command line... but let's keep things simple for now
-# params = inspect.signature(PPOConfig.__init__).parameters.values()
-# fields = [(p.name, p.annotation.__args__[0], p.default) for p in params if p.name != "self"]
-# fields = [f for f in fields if f[1] != dict]
-# MyPPOConfig = dataclasses.make_dataclass("MyPPOConfig", fields)
 
 
 @dataclass
@@ -91,19 +82,6 @@ class DataConfig:
     @property
     def completion_len_range(self):
         return self.completion_min_len, self.completion_max_len
-
-
-@dataclass
-class RMTrainerConfig:
-    lr: float = 1e-4
-    num_epochs: int = 5
-    batch_size: int = 32
-    train_eval_split_ratio: float = 0.8
-
-
-@dataclass
-class Exp3Config:
-    dpo_train_set_size: int = 16 * 1024
 
 
 @dataclass

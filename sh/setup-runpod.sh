@@ -1,5 +1,5 @@
 
-#ssh $HOST unminimize
+# ssh $HOST unminimize
 ssh $HOST apt update
 ssh $HOST apt install -y rsync vim nvtop htop tmux
 ssh $HOST "curl https://repo.anaconda.com/miniconda/Miniconda3-py310_23.5.1-0-Linux-x86_64.sh >/workspace/miniconda.sh"

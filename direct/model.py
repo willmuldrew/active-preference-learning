@@ -12,19 +12,12 @@ from trl.models.modeling_value_head import AutoModelForCausalLMWithValueHead
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 from direct.config import *
-from direct.dpo_trainer import DirectPreferenceTrainer
-from direct.ppo_trainer import PPOPreferenceTrainer
 from direct.types import TModel
 
 MODEL_REGISTRY = {
     "gpt2_value": AutoModelForCausalLMWithValueHead,
     "gpt2": GPT2LMHeadModel,
     "gpt-neox": GPTNeoXForCausalLM,
-}
-
-TRAINER_REGISTRY = {
-    "direct": DirectPreferenceTrainer,
-    "ppo": PPOPreferenceTrainer,
 }
 
 

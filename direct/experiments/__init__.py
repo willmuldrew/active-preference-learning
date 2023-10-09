@@ -3,14 +3,10 @@ import wandb
 
 from direct.config import ExperimentConfig
 
-from direct.experiments import (experiment1, experiment3, experiment4, experiment5)
+from direct.experiments import (experiment5)
 
 
 EXPERIMENTS = {
-    "exp1": experiment1.run,
-    "exp3-dpo": experiment3.run_dpo,
-    "exp3-ppo-gt": experiment3.run_ppo_gt,
-    "exp4": experiment4.run,
     "exp5": experiment5.run,
 }
 

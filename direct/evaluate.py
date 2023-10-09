@@ -17,7 +17,7 @@ from direct.oracles import PreferenceOracle
 @torch.no_grad()
 def evaluate_model(model, ref_model, tokenizer, dataset,
                    preference_oracle: PreferenceOracle, config: ExperimentConfig, num_batches=None,
-                   include_samples: bool = True, prefix="eval", shuffle_data=True, do_sample=True,
+                   prefix="eval", shuffle_data=True, do_sample=True,
                    sample_temperature=1.0, vs_model=None, save_path=None):
     """
     Evaluate generative model against a given dataset and preference model.  Samples a number of batches from the

@@ -7,7 +7,6 @@ from transformers import PreTrainedTokenizerBase, DataCollatorForLanguageModelin
 from trl import create_reference_model
 
 import direct.model
-from direct import utils as utils
 from direct.config import ExperimentConfig
 from direct.types import TModel
 

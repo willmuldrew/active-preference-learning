@@ -3,9 +3,8 @@ export PYTHONPATH=.
 M_SCHEDULE="[64,128,192,256,320,384,448,512,576,640,704,768]"
 EVAL_SCHEDULE="[128,256,512,768]"
 
-# NOTE: provide seeds on the command line!
-#SEEDS="42 41697 29716"
-#SEEDS=42
+# NOTE: provide seeds on the command line in an environment variable
+# SEEDS="42 41697 29716"
 
 EVAL_TEST_SET_SIZE=512
 
