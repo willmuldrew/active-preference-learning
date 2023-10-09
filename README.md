@@ -1,6 +1,11 @@
+Active Preference Learning
+--------------------------
 
-Snapshot of code for my UCL MSc Machine Learning thesis 
+Code snapshot for my UCL MSc Machine Learning thesis.
 
-Entrypoints/experiments in ./direct
-Run-scripts in ./sh
+* Code in ./direct
+* Setup and experimental launchers in ./sh
+* Analysis notebooks in ./notebooks
+
+
 
