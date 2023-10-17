@@ -10,7 +10,7 @@ ssh $HOST "/workspace/miniconda3/bin/conda init"
 HOST=$HOST bash ./sync_runpod.sh
 
 ssh $HOST /workspace/miniconda3/bin/python -m venv /workspace/preference-learning/venv
-ssh $HOST /workspace/preference-learning/venv/bin/pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+ssh $HOST /workspace/preference-learning/venv/bin/pip3 install torch==2.0.1 --index-url https://download.pytorch.org/whl/cu118
 ssh $HOST /workspace/preference-learning/venv/bin/pip install -r /workspace/preference-learning/requirements.txt
 ssh $HOST /workspace/preference-learning/venv/bin/pip install --upgrade pip
 
