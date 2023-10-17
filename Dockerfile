@@ -16,3 +16,5 @@ RUN /root/miniconda3/bin/pip3 install torch==2.0.1 --index-url https://download.
 
 COPY requirements.txt /root/requirements.txt
 RUN /root/miniconda3/bin/pip3 install -r /root/requirements.txt 
+
+RUN echo export PATH=/root/miniconda3/bin:$PATH >> /root/.bashrc
