@@ -38,7 +38,7 @@ def run(config: ExperimentConfig):
     gen_model, gen_tokenizer = get_generative_model(config)
 
     preference_oracle = get_preference_oracle(config)
-    gen_trainer = direct.model.DirectPreferenceTrainer(config, gen_model, gen_tokenizer)
+    gen_trainer = direct.dpo_trainer.DirectPreferenceTrainer(config, gen_model, gen_tokenizer)
 
     prompt_datasets = load_prompt_dataset(tokenizer=gen_tokenizer, config=config)
 
