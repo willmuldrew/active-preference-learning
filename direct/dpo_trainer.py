@@ -5,6 +5,7 @@ import torch
 from torch import Tensor
 from transformers import PreTrainedTokenizerBase, DataCollatorForLanguageModeling
 from trl import create_reference_model
+import bitsandbytes as bnb
 
 import direct.model
 from direct.config import ExperimentConfig
@@ -40,12 +41,11 @@ class DirectPreferenceTrainer:
         self.optimizer = self.initialise_optimizer(self.model)
 
     def initialise_optimizer(self, model):
-        # import bitsandbytes as bnb
-        # return bnb.optim.Adam8bit(model.parameters(), lr=self.config.train.lr)
+        return bnb.optim.PagedAdam8bit(model.parameters(), lr=self.config.train.lr)
         # return bnb.optim.RMSprop8bit(model.parameters(), lr=self.config.train.lr)
         # TODO: investigate other optimisers - DPO reference code suggests that RMSProp can be used without significant
         #       impact
-        return torch.optim.Adam(model.parameters(), lr=self.config.train.lr)
+        # return torch.optim.Adam(model.parameters(), lr=self.config.train.lr)
 
     def loss(self,
              logprobs_w: Tensor, response_mask_w: Tensor, ref_logprobs_w: Tensor,
@@ -78,6 +78,7 @@ class DirectPreferenceTrainer:
             self.model, self.ref_model, self.tokenizer,
             [t.to(self.config.device) for t in query_tokens],  # list of ragged prompts, no padding
             [t.to(self.config.device) for t in response_tokens],  # list of ragged responses, no padding
+            use_cache=not self.model.is_gradient_checkpointing
         )
 
     def step_pairs(self, batch_pairs, grad_acc_steps: int):

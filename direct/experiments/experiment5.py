@@ -37,6 +37,8 @@ def run(config: ExperimentConfig):
 
     gen_model, gen_tokenizer = get_generative_model(config)
 
+    gen_model.gradient_checkpointing_enable()
+
     preference_oracle = get_preference_oracle(config)
     gen_trainer = direct.dpo_trainer.DirectPreferenceTrainer(config, gen_model, gen_tokenizer)
 
@@ -116,12 +118,16 @@ def simple_training_loop(
 
         train_dl = torch.utils.data.DataLoader(training_data, config.train.effective_batch_size, collate_fn=utils.records_to_cols, shuffle=True)
 
+        # Need to do this since gradient checkpointing won't be done without being in the right mode
+        gen_trainer.model.train()
+
         stop = False
         step = -1
         epoch = -1
         while not stop:
             epoch += 1
             for batch in train_dl:
+                torch.cuda.reset_peak_memory_stats()
                 step += 1
 
                 if config.exp5.max_steps is not None and config.exp5.max_steps > 0:
@@ -159,6 +165,8 @@ def simple_training_loop(
                         do_eval("interim_training",
                                 save_path=maybe_get_eval_save_path(
                                     f"evaluation_m{len(training_data)}_step-{step}_midepoch-{epoch}"))
+
+                print(f"Maximum GPU memory used: {torch.cuda.max_memory_allocated() / (1024 * 1024):.2f} MB")
 
             if config.eval.eval_epoch_interval is not None and config.eval.eval_epoch_interval > 0:
                 if epoch % config.eval.eval_epoch_interval == 0:

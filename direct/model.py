@@ -49,7 +49,8 @@ def batch_forward_pass(model: TModel,
                        ref_model: TModel,
                        tokenizer: PreTrainedTokenizerBase,
                        prompt_tokens: list[Tensor],
-                       completion_tokens: list[Tensor]):
+                       completion_tokens: list[Tensor],
+                       use_cache=True):
     assert(not hasattr(model, "is_encoder_decoder")), "not implemented for encoder-decoder models!"
 
     collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
@@ -63,7 +64,7 @@ def batch_forward_pass(model: TModel,
     assert len((input_ids[:, 0] == tokenizer.pad_token_id).nonzero()) == 0, \
         "Not expecting any left padding here - since we're not using an attention mask"
 
-    model_output = model(input_ids)
+    model_output = model(input_ids, use_cache=use_cache)
 
     # n x num tokens x vocab size
     logits = _get_logits_from_model_output(model_output)

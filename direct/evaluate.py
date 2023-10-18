@@ -45,6 +45,8 @@ def evaluate_model(model, ref_model, tokenizer, dataset,
         completions = []
         vs_completions = []
 
+        model.eval()
+
         for n_batch, batch in tqdm(enumerate(test_dataloader), desc=f"Generating {len(dataset)} eval completions", total=len(dataset) // config.eval.batch_size):
             len_batch = len(batch["prompt"])
             if len_batch != config.eval.batch_size:
