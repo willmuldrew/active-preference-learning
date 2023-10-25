@@ -9,6 +9,7 @@ Code snapshot for my UCL MSc Machine Learning thesis.
 
 Setup (python3.10)
 -----
+    # first install miniconda and put it in your path
   
     python -m venv venv
     . venv/bin/activate
