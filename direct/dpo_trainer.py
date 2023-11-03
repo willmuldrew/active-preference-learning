@@ -127,6 +127,8 @@ class DirectPreferenceTrainer:
 
             loss.backward()
             losses.append(loss.item())
+            # bit hacky, but keeps a lid on VRAM usage
+            torch.cuda.empty_cache()
 
         self.optimizer.step()
         self.optimizer.zero_grad()
