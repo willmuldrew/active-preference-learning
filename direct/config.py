@@ -27,6 +27,7 @@ class TrainerConfig:
     lr: float = 1.41e-5
     lr_ramp_start_factor: float = 1.0
     lr_ramp_total_iters: int = 1
+    optimizer: str = "Adam"
     batch_size: int = 256
     grad_acc_steps: int = 1
     # WJM - this is Peter's hack to disable KL (i.e. the P in PPO!)... seems to

@@ -41,11 +41,17 @@ class DirectPreferenceTrainer:
         self.optimizer = self.initialise_optimizer(self.model)
 
     def initialise_optimizer(self, model):
-        return bnb.optim.PagedAdam8bit(model.parameters(), lr=self.config.train.lr)
+        # return bnb.optim.PagedAdam8bit(model.parameters(), lr=self.config.train.lr)
         # return bnb.optim.RMSprop8bit(model.parameters(), lr=self.config.train.lr)
         # TODO: investigate other optimisers - DPO reference code suggests that RMSProp can be used without significant
         #       impact
-        # return torch.optim.Adam(model.parameters(), lr=self.config.train.lr)
+        if self.config.train.optimizer == "Adam":
+            return torch.optim.Adam(model.parameters(), lr=self.config.train.lr)
+        elif self.config.train.optimizer == "PagedAdam8bit":
+            return bnb.optim.PagedAdam8bit(model.parameters(), lr=self.config.train.lr)
+        else:
+            raise NotImplementedError(f"Don't know how to create a {self.config.train.optimizer} instance")
+
 
     def loss(self,
              logprobs_w: Tensor, response_mask_w: Tensor, ref_logprobs_w: Tensor,
