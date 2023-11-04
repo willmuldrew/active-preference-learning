@@ -309,7 +309,9 @@ def simple_training_loop(
         current_dataset = list(current_dataset)
         while len(current_dataset) < target_m:
             required_new = target_m - len(current_dataset)
-            new_data = acquire_completion_pairs(minimum_count=required_new)
+            with torch.no_grad():
+                gen_model.eval()
+                new_data = acquire_completion_pairs(minimum_count=required_new)
 
             # Now get labels
             oracle_response = preference_oracle.consult_the_oracle(
