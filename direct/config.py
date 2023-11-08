@@ -60,7 +60,7 @@ class EvalConfig:
     test_set_size: int = 4096
     batch_size: int = 32
     perform_final_full_eval: bool = False
-    vs_ref_model_eval: bool = False
+    versus: str = "ref_model"  # can also be 'label'
     sampling_temperatures: list[float] = field(default_factory=lambda: [1.0, 0.7, 0.0])
 
 

@@ -342,7 +342,7 @@ def simple_training_loop(
                 config,
                 sample_temperature=t,
                 prefix=f"{prefix}/eval_T{t:0.2f}",
-                vs_model=gen_trainer.ref_model if config.eval.vs_ref_model_eval else None,
+                versus=config.eval.versus,
                 save_path=save_path + f"_T{t:0.2f}.json",
             )
             if additional_stats is not None:

@@ -57,7 +57,7 @@ def load_prompt_dataset(tokenizer: PreTrainedTokenizerBase, config: ExperimentCo
             )
 
         dataset = dataset.map(map_fn, batched=True, num_proc=config.data.num_proc)
-        dataset = dataset.remove_columns([c for c in dataset.column_names if c not in ["prompt"]])
+        dataset = dataset.remove_columns([c for c in dataset.column_names if c not in ["prompt", "label"]])
 
         datasets[split] = dataset
 
