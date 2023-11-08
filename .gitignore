@@ -4,3 +4,4 @@ __pycache__
 .idea
 .ipynb_checkpoints
 openai-request-log.jsonl
+*.swp
