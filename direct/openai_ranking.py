@@ -118,6 +118,16 @@ Preferred: <"A" or "B">\
 IMDB_SYSTEM_PROMPT = "You are a helpful assistant that evaluates the quality and positive sentiment of movie reviews"
 TLDR_SYSTEM_PROMPT = "You are a helpful assistant that evaluates the quality of summaries for internet posts"
 
+# This is a little hacky, but I don't want to leak EOS tokens to the oracle and I don't have access to them here
+EOS_TOKENS = ["<|endoftext|>"]
+
+
+def cleanup_completion(c):
+    c = c.strip()
+    for t in EOS_TOKENS:
+        c = c.replace(t, "")
+    return c
+
 
 def get_preference(prompt: str, completion_a: str, completion_b: str, task_name: str, model: str = "gpt-3.5-turbo", request_logger=None, oracle_temperature=0.05, provider="azure") -> dict:
     if model not in OPENAI_PRICING.keys():
@@ -146,7 +156,10 @@ def get_preference(prompt: str, completion_a: str, completion_b: str, task_name:
         "tldr": (get_tldr_prompt, TLDR_SYSTEM_PROMPT),
         "imdb": (get_imdb_prompt, IMDB_SYSTEM_PROMPT),
     }[task_name]
-    question = question_fn(prompt, completion_a, completion_b)
+    question = question_fn(
+        prompt,
+        cleanup_completion(completion_a),
+        cleanup_completion(completion_b))
 
     # print(system_prompt, "\n", question)
 

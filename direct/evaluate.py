@@ -14,12 +14,6 @@ from direct.config import *
 from direct.oracles import PreferenceOracle
 
 
-def cleanup_completion(c, tokenizer):
-    c = c.strip()
-    c = c.replace(tokenizer.eos_token, "")
-    return c
-
-
 @torch.no_grad()
 def evaluate_model(model, ref_model, tokenizer, dataset,
                    preference_oracle: PreferenceOracle, config: ExperimentConfig, num_batches=None,
@@ -99,10 +93,6 @@ def evaluate_model(model, ref_model, tokenizer, dataset,
                     vs_completions.extend(vs_responses.completion)
                 elif versus == "label":
                     vs_completions.extend(batch["label"])
-
-        # Remove any leading/trailing spaces as well as any eos tokens
-        completions = [cleanup_completion(c, tokenizer) for c in completions]
-        vs_completions = [cleanup_completion(c, tokenizer) for c in vs_completions]
 
         try:
             scores = preference_oracle.get_scores(prompts, completions)
