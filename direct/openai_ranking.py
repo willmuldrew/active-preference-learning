@@ -21,6 +21,10 @@ OPENAI_PRICING = {
         "prompt_tokens": 0.03 / 1000,
         "completion_tokens": 0.06 / 1000,
     },
+    "gpt-4-1106-preview": {
+        "prompt_tokens": 0.01 / 1000,
+        "completion_tokens": 0.03 / 1000,
+    }
 }
 
 OPENAI_PRICING["gpt-4-0613"] = OPENAI_PRICING["gpt-4"]
