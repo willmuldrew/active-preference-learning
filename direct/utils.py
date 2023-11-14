@@ -190,3 +190,10 @@ def seed_everything(seed):
     torch.random.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
+
+
+def tensor_serialize(obj):
+    if isinstance(obj, torch.Tensor):
+        return obj.tolist()
+    raise TypeError("Type not serializable")
+

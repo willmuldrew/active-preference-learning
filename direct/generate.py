@@ -136,10 +136,8 @@ class CompletionSetGenerator:
             self.generate_kwargs,
             device) for _ in range(self.num_completions)]
 
-        res = dict(
-            prompt=batch["prompt"],
-            prompt_tokens=[t.to(dest_device) for t in completions[0].prompt_tokens]
-        )
+        res = dict(batch)
+        res["prompt_tokens"] = [t.to(dest_device) for t in completions[0].prompt_tokens]
         for n in range(self.num_completions):
             res[f"completion_{n}"] = completions[n].completion
             res[f"completion_tokens_{n}"] = [t.to(dest_device) for t in completions[n].completion_tokens]

@@ -71,14 +71,6 @@ def simple_training_loop(
         test_prompt_dataset,
         preference_oracle, step_fn
 ):
-    # We're going to use these prompts for generation - crank up the batch size to make it go faster
-    prompt_dataloader = torch.utils.data.DataLoader(
-        train_prompt_dataset,
-        config.exp5.prompt_batch_size,
-        shuffle=True,
-        drop_last=True,
-    )
-
     source_model = gen_model
     if config.exp5.acquire_pairs_function == "OFFLINE":
         source_model = gen_trainer.ref_model
@@ -109,14 +101,14 @@ def simple_training_loop(
             f"step: {scalar_stats['step']} epoch: {scalar_stats['epoch']} m: {scalar_stats['m']}",
             scalar_stats)
 
-    def train_to_convergence(training_data):
+    def train_to_convergence(_training_data):
         lr_scheduler = torch.optim.lr_scheduler.LinearLR(gen_trainer.optimizer,
                                                          start_factor=config.train.lr_ramp_start_factor,
                                                          total_iters=config.train.lr_ramp_total_iters)
 
         early_stopper = direct.utils.LossMAEarlyStopper(threshold=config.exp5.loss_ma_early_stopper_threshold)
 
-        train_dl = torch.utils.data.DataLoader(training_data, config.train.effective_batch_size, collate_fn=utils.records_to_cols, shuffle=True)
+        train_dl = torch.utils.data.DataLoader(_training_data, config.train.effective_batch_size, collate_fn=utils.records_to_cols, shuffle=True)
 
         # Need to do this since gradient checkpointing won't be done without being in the right mode
         gen_trainer.model.train()
@@ -164,21 +156,19 @@ def simple_training_loop(
                     if step % config.eval.interim_eval_interval_steps == 0:
                         do_eval("interim_training",
                                 save_path=maybe_get_eval_save_path(
-                                    f"evaluation_m{len(training_data)}_step-{step}_midepoch-{epoch}"))
+                                    f"evaluation_m{len(_training_data)}_step-{step}_midepoch-{epoch}"))
 
                 print(f"Maximum GPU memory used: {torch.cuda.max_memory_allocated() / (1024 * 1024):.2f} MB")
 
             if config.eval.eval_epoch_interval is not None and config.eval.eval_epoch_interval > 0:
                 if epoch % config.eval.eval_epoch_interval == 0:
                     do_eval("interim_training", save_path=maybe_get_eval_save_path(
-                                        f"evaluation_m{len(training_data)}_step-{step}_endepoch-{epoch}"))
+                                        f"evaluation_m{len(_training_data)}_step-{step}_endepoch-{epoch}"))
 
             if early_stopper.should_stop():
                 break
 
-    i_prompt_dataloader = iter(itertools.cycle(prompt_dataloader))
-
-    def acquire_completion_pairs_random(minimum_count):
+    def acquire_completion_pairs_random(minimum_count, i_prompt_dataloader):
         """
         NB: May return more than minimum_count...
         """
@@ -191,7 +181,7 @@ def simple_training_loop(
                 pbar.update(len(new_data) - pbar.n)
         return new_data
 
-    def acquire_completion_pairs_uncertainty(minimum_count, which, over_generate_factor=1):
+    def acquire_completion_pairs_uncertainty(minimum_count, i_prompt_dataloader, which, over_generate_factor=1):
         """
         May return more than minimum_count...
         """
@@ -236,13 +226,13 @@ def simple_training_loop(
 
         return new_data
 
-    def acquire_completion_pairs_predictive_entropy(minimum_count, over_sample_prompts_factor=1, entropy_sample_n=16):
+    def acquire_completion_pairs_predictive_entropy(minimum_count, i_prompt_dataloader, over_sample_prompts_factor=1, entropy_sample_n=16, generate_completions=True):
         """
         We're going to select our *prompts* using an MC estimate of the entropy of the conditional response distribution
 
         Simple version:  https://arxiv.org/pdf/2207.05221.pdf p29
         """
-        print(f"generating {minimum_count} datapoints using ENTROPY")
+        print(f"selecting {minimum_count} prompts using ENTROPY")
 
         # over sample prompts from our loader
         prompts = []
@@ -251,32 +241,55 @@ def simple_training_loop(
         prompts = prompts[:minimum_count * over_sample_prompts_factor]
 
         # now score and take the best/worst
-        h = []
+        prompt_entropy: list[(float, str)] = []
         for prompt in tqdm(prompts, desc=f"estimating prompt entropy (n={entropy_sample_n}) for {len(prompts)} prompts"):
-            h.append(estimate_prompt_entropy(prompt, gen_model, gen_tokenizer, config.exp5.prompt_batch_size, n=entropy_sample_n))
+            prompt_entropy.append((
+                estimate_prompt_entropy(prompt, gen_model, gen_tokenizer, config.exp5.prompt_batch_size, n=entropy_sample_n),
+                prompt
+            ))
 
         # now we want to take the highest entropy (most uncertain) prompts
-        prompts = [prompts[n] for n in torch.argsort(torch.Tensor(h))]
-        prompts = prompts[-minimum_count:]
-        random.shuffle(prompts)
+        prompt_entropy.sort()
+        prompt_entropy = prompt_entropy[-minimum_count:]
+        random.shuffle(prompt_entropy)
 
         # Now need to generate pairs...
         new_data = []
 
-        filtered_prompt_dataloader = torch.utils.data.DataLoader(prompts, config.exp5.prompt_batch_size)
-        # for prompt_batch in tqdm(filtered_prompt_dataloader, desc="Generating completion pairs from filtered prompts"):
-        #     new_data.extend(utils.cols_to_records(
-        #         completion_pair_generator.generate(prompt_batch, config.device, "cpu")
-        #     ))
+        filtered_prompt_dataloader = torch.utils.data.DataLoader(prompt_entropy, config.exp5.prompt_batch_size)
         for prompt_batch in filtered_prompt_dataloader:
-            new_data.extend(utils.cols_to_records(
-                completion_pair_generator.generate(dict(prompt=prompt_batch), config.device, "cpu")
-            ))
+            if generate_completions:
+                new_data.extend(utils.cols_to_records(
+                    completion_pair_generator.generate(dict(prompt=prompt_batch[1], prompt_entropy=prompt_batch[0]), config.device, "cpu")
+                ))
+            else:
+                new_data.extend(utils.cols_to_records(dict(prompt=prompt_batch[1], prompt_entropy=prompt_batch[0])))
 
         return new_data
 
+    def acquire_completion_pairs_entropy_and_certainty(minimum_count, i_prompt_dataloader, over_sample_prompts_factor=1, entropy_sample_n=16, over_generate_factor=4):
+        prompts = acquire_completion_pairs_predictive_entropy(
+            minimum_count=minimum_count * over_generate_factor,
+            i_prompt_dataloader=i_prompt_dataloader,
+            over_sample_prompts_factor=over_sample_prompts_factor,
+            entropy_sample_n=entropy_sample_n,
+            generate_completions=False, )
+
+        prompt_loader = torch.utils.data.DataLoader(
+            prompts,
+            config.exp5.prompt_batch_size,
+            shuffle=True,
+            drop_last=True,
+        )
+
+        return acquire_completion_pairs_uncertainty(
+            minimum_count=minimum_count,
+            i_prompt_dataloader=iter(prompt_loader),
+            which="least",
+            over_generate_factor=over_generate_factor)
+
     @torch.no_grad()
-    def estimate_prompt_entropy(prompt, gen_model, tokenizer, batch_size, n=32):
+    def estimate_prompt_entropy(prompt, _gen_model, tokenizer, batch_size, n=32):
         assert (n % batch_size == 0), "n should be multiple of batch size"
         h_sum = 0.0
         for _ in range(n // batch_size):
@@ -284,10 +297,10 @@ def simple_training_loop(
             gen_args = dict(config.generate_gpt2.to_kwargs())
             gen_args["temperature"] = 1.0
             generated_output = direct.generate.generate(
-                gen_model, tokenizer, [prompt] * batch_size, gen_lens, gen_args, config.device, True)
+                _gen_model, tokenizer, [prompt] * batch_size, gen_lens, gen_args, config.device, True)
 
-            logprobs, response_mask, ref_logprobs = direct.model.batch_forward_pass(gen_model, None, tokenizer,
-                                            generated_output.prompt_tokens, generated_output.completion_tokens)
+            logprobs, response_mask, ref_logprobs = direct.model.batch_forward_pass(_gen_model, None, tokenizer,
+                                                                                    generated_output.prompt_tokens, generated_output.completion_tokens)
 
             h_sum += -((logprobs * response_mask).sum()).item() / batch_size
 
@@ -301,17 +314,27 @@ def simple_training_loop(
         UNCERTAINTY=partial(acquire_completion_pairs_uncertainty, which='most', over_generate_factor=config.exp5.over_generate_factor),
         MID_UNCERTAINTY=partial(acquire_completion_pairs_uncertainty, which='mid', over_generate_factor=config.exp5.over_generate_factor),
         TAILS_UNCERTAINTY=partial(acquire_completion_pairs_uncertainty, which='tails', over_generate_factor=config.exp5.over_generate_factor),
-        ENTROPY=partial(acquire_completion_pairs_predictive_entropy, over_sample_prompts_factor=config.exp5.over_sample_prompts_factor, entropy_sample_n=config.exp5.entropy_sample_n)
+        ENTROPY=partial(acquire_completion_pairs_predictive_entropy, over_sample_prompts_factor=config.exp5.over_sample_prompts_factor, entropy_sample_n=config.exp5.entropy_sample_n),
+        ENTROPY_AND_CERTAINTY=partial(acquire_completion_pairs_entropy_and_certainty, over_sample_prompts_factor=config.exp5.over_sample_prompts_factor, entropy_sample_n=config.exp5.entropy_sample_n, over_generate_factor=config.exp5.over_generate_factor),
     )[config.exp5.acquire_pairs_function]
 
-    def expand_training_dataset(current_dataset, target_m):
+    prompt_dataloader = torch.utils.data.DataLoader(
+        train_prompt_dataset,
+        config.exp5.prompt_batch_size,
+        shuffle=True,
+        drop_last=True,
+    )
+
+    def expand_training_dataset(current_dataset, target_m, i_prompt_dataloader):
         print(f"Expanding dataset from {len(current_dataset)} to {target_m}")
         current_dataset = list(current_dataset)
         while len(current_dataset) < target_m:
             required_new = target_m - len(current_dataset)
             with torch.no_grad():
                 gen_model.eval()
-                new_data = acquire_completion_pairs(minimum_count=required_new)
+                new_data = acquire_completion_pairs(
+                    minimum_count=required_new,
+                    i_prompt_dataloader=i_prompt_dataloader)
 
             # Now get labels
             oracle_response = preference_oracle.consult_the_oracle(
@@ -351,20 +374,11 @@ def simple_training_loop(
             if config.log:
                 wandb.log(eval_stats)
 
+    i_raw_prompt_dataloader = iter(itertools.cycle(prompt_dataloader))
+
     training_data = []
     m_schedule = config.exp5.m_schedule
     eval_m_schedule = config.exp5.eval_m_schedule or m_schedule
-
-    # TODO
-    #  [x] establish good systematic stopping criterion
-    #     - let's evaluate the win rate every 10 steps for a single run with M=128 - see how win-rate and training loss co-evolve
-    #     - training to some low training error seems to be a useful proxy and doesn't seem to overfit - though I should probably do some really long runs with small and larger m
-    #  [x] add eval (end of training, but also optionally during training)
-    #  [x] more metric logging
-    #  [ ] checkpoint writing
-    #  [ ] different datapoint acquisition functions
-    #  [x] make seedable/more deterministic
-    #  [ ] what if I discard the existing data each time (recycle vs reacquire)? Question I posed in PH meeting on 21st Sept - seems interesting, but manana
 
     print("m_schedule", m_schedule)
     print("eval_m_schedule", eval_m_schedule)
@@ -372,15 +386,14 @@ def simple_training_loop(
     for m in m_schedule:
         if config.exp5.reacquire_all_data:
             training_data.clear()
-        training_data = expand_training_dataset(training_data, m)
+        training_data = expand_training_dataset(training_data, m, i_raw_prompt_dataloader)
 
         if wandb.run.dir is not None:
             data_dump_path = os.path.join(wandb.run.dir, f"training_data_m{m}.jsonl")
             print(f"Logging {len(training_data)} rows of training data -> {data_dump_path}")
             with open(data_dump_path, "wt", encoding="utf-8") as f:
                 for p in training_data:
-                    p2 = {k: v for k, v in p.items() if not isinstance(v, torch.Tensor)}
-                    json.dump(p2, f)
+                    json.dump(p, f, default=utils.tensor_serialize)
                     f.write("\n")
 
         reset_model()
