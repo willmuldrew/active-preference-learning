@@ -226,13 +226,13 @@ def simple_training_loop(
 
         return new_data
 
-    def acquire_completion_pairs_predictive_entropy(minimum_count, i_prompt_dataloader, over_sample_prompts_factor=1, entropy_sample_n=16, generate_completions=True):
+    def acquire_completion_pairs_predictive_entropy(minimum_count, i_prompt_dataloader, over_sample_prompts_factor=1, entropy_sample_n=16, generate_completions=True, which_entropy="HIGH"):
         """
         We're going to select our *prompts* using an MC estimate of the entropy of the conditional response distribution
 
         Simple version:  https://arxiv.org/pdf/2207.05221.pdf p29
         """
-        print(f"selecting {minimum_count} prompts using ENTROPY")
+        print(f"selecting {minimum_count} prompts using {which_entropy} ENTROPY")
 
         # over sample prompts from our loader
         prompts = []
@@ -250,7 +250,13 @@ def simple_training_loop(
 
         # now we want to take the highest entropy (most uncertain) prompts
         prompt_entropy.sort()
-        prompt_entropy = prompt_entropy[-minimum_count:]
+        if which_entropy == "HIGH":
+            prompt_entropy = prompt_entropy[-minimum_count:]
+        elif which_entropy == "LOW":
+            prompt_entropy = prompt_entropy[:minimum_count]
+        else:
+            raise NotImplementedError(f"Don't know how to choose '{which_entropy}' entropy")
+
         random.shuffle(prompt_entropy)
 
         # Now need to generate pairs...
@@ -267,13 +273,15 @@ def simple_training_loop(
 
         return new_data
 
-    def acquire_completion_pairs_entropy_and_certainty(minimum_count, i_prompt_dataloader, over_sample_prompts_factor=1, entropy_sample_n=16, over_generate_factor=4):
+    def acquire_completion_pairs_entropy_and_certainty(minimum_count, i_prompt_dataloader, over_sample_prompts_factor=1, entropy_sample_n=16, over_generate_factor=4, which_entropy="HIGH"):
         prompts = acquire_completion_pairs_predictive_entropy(
             minimum_count=minimum_count * over_generate_factor,
             i_prompt_dataloader=i_prompt_dataloader,
             over_sample_prompts_factor=over_sample_prompts_factor,
             entropy_sample_n=entropy_sample_n,
-            generate_completions=False, )
+            which_entropy=which_entropy,
+            generate_completions=False,
+        )
 
         prompt_loader = torch.utils.data.DataLoader(
             prompts,
@@ -291,6 +299,7 @@ def simple_training_loop(
     @torch.no_grad()
     def estimate_prompt_entropy(prompt, _gen_model, tokenizer, batch_size, n=32):
         assert (n % batch_size == 0), "n should be multiple of batch size"
+        assert (not _gen_model.training)
         h_sum = 0.0
         for _ in range(n // batch_size):
             gen_lens = direct.utils.LengthSampler(*config.data.completion_len_range)(n=batch_size)
@@ -314,8 +323,10 @@ def simple_training_loop(
         UNCERTAINTY=partial(acquire_completion_pairs_uncertainty, which='most', over_generate_factor=config.exp5.over_generate_factor),
         MID_UNCERTAINTY=partial(acquire_completion_pairs_uncertainty, which='mid', over_generate_factor=config.exp5.over_generate_factor),
         TAILS_UNCERTAINTY=partial(acquire_completion_pairs_uncertainty, which='tails', over_generate_factor=config.exp5.over_generate_factor),
-        ENTROPY=partial(acquire_completion_pairs_predictive_entropy, over_sample_prompts_factor=config.exp5.over_sample_prompts_factor, entropy_sample_n=config.exp5.entropy_sample_n),
-        ENTROPY_AND_CERTAINTY=partial(acquire_completion_pairs_entropy_and_certainty, over_sample_prompts_factor=config.exp5.over_sample_prompts_factor, entropy_sample_n=config.exp5.entropy_sample_n, over_generate_factor=config.exp5.over_generate_factor),
+        HIGH_ENTROPY=partial(acquire_completion_pairs_predictive_entropy, over_sample_prompts_factor=config.exp5.over_sample_prompts_factor, entropy_sample_n=config.exp5.entropy_sample_n, which_entropy="HIGH"),
+        LOW_ENTROPY=partial(acquire_completion_pairs_predictive_entropy, over_sample_prompts_factor=config.exp5.over_sample_prompts_factor, entropy_sample_n=config.exp5.entropy_sample_n, which_entropy="LOW"),
+        HIGH_ENTROPY_AND_CERTAINTY=partial(acquire_completion_pairs_entropy_and_certainty, over_sample_prompts_factor=config.exp5.over_sample_prompts_factor, entropy_sample_n=config.exp5.entropy_sample_n, over_generate_factor=config.exp5.over_generate_factor, which_entropy="HIGH"),
+        LOW_ENTROPY_AND_CERTAINTY=partial(acquire_completion_pairs_entropy_and_certainty, over_sample_prompts_factor=config.exp5.over_sample_prompts_factor, entropy_sample_n=config.exp5.entropy_sample_n, over_generate_factor=config.exp5.over_generate_factor, which_entropy="LOW"),
     )[config.exp5.acquire_pairs_function]
 
     prompt_dataloader = torch.utils.data.DataLoader(
