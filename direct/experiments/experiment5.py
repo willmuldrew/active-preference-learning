@@ -241,12 +241,16 @@ def simple_training_loop(
         prompts = prompts[:minimum_count * over_sample_prompts_factor]
 
         # now score and take the best/worst
-        prompt_entropy: list[(float, str)] = []
-        for prompt in tqdm(prompts, desc=f"estimating prompt entropy (n={entropy_sample_n}) for {len(prompts)} prompts"):
-            prompt_entropy.append((
-                estimate_prompt_entropy(prompt, gen_model, gen_tokenizer, config.exp5.prompt_batch_size, n=entropy_sample_n),
-                prompt
-            ))
+        prompt_entropy: list[(float, str)] = list(
+            zip(estimate_prompt_entropy_batch(prompts, gen_model, gen_tokenizer, config.exp5.prompt_batch_size, n=entropy_sample_n), prompts))
+
+        # prompt_entropy: list[(float, str)] = []
+        # for prompt in tqdm(prompts, desc=f"estimating prompt entropy (n={entropy_sample_n}) for {len(prompts)} prompts"):
+        #     prompt_entropy.append((
+        #         estimate_prompt_entropy(prompt, gen_model, gen_tokenizer, config.exp5.prompt_batch_size, n=entropy_sample_n),
+        #         prompt
+        #     ))
+
 
         # now we want to take the highest entropy (most uncertain) prompts
         prompt_entropy.sort()
@@ -296,25 +300,57 @@ def simple_training_loop(
             which="least",
             over_generate_factor=over_generate_factor)
 
+    # @torch.no_grad()
+    # def estimate_prompt_entropy(prompt, _gen_model, tokenizer, batch_size, n=32):
+    #     assert (n % batch_size == 0), "n should be multiple of batch size"
+    #     assert (not _gen_model.training)
+    #     h_sum = 0.0
+    #     for _ in range(n // batch_size):
+    #         gen_lens = direct.utils.LengthSampler(*config.data.completion_len_range)(n=batch_size)
+    #         gen_args = dict(config.generate_gpt2.to_kwargs())
+    #         gen_args["temperature"] = 1.0
+    #         generated_output = direct.generate.generate(
+    #             _gen_model, tokenizer, [prompt] * batch_size, gen_lens, gen_args, config.device, True)
+    #
+    #         logprobs, response_mask, ref_logprobs = direct.model.batch_forward_pass(_gen_model, None, tokenizer,
+    #                                                                                 generated_output.prompt_tokens, generated_output.completion_tokens)
+    #
+    #         h_sum += -((logprobs * response_mask).sum()).item() / batch_size
+    #
+    #     h = h_sum / (n // batch_size)
+    #     return h
+
     @torch.no_grad()
-    def estimate_prompt_entropy(prompt, _gen_model, tokenizer, batch_size, n=32):
-        assert (n % batch_size == 0), "n should be multiple of batch size"
+    def estimate_prompt_entropy_batch(prompts, _gen_model, tokenizer, batch_size, n=32):
         assert (not _gen_model.training)
-        h_sum = 0.0
-        for _ in range(n // batch_size):
-            gen_lens = direct.utils.LengthSampler(*config.data.completion_len_range)(n=batch_size)
+
+        all_prompts = []
+        all_hs = []
+
+        for prompt in prompts:
+            all_prompts.extend([prompt] * n)
+
+        for prompt_batch in tqdm(torch.utils.data.DataLoader(all_prompts, batch_size, shuffle=False, drop_last=False),
+                                 desc=f"estimating prompt entropy (n={n}) for {len(prompts)} prompts"):
+            gen_lens = direct.utils.LengthSampler(*config.data.completion_len_range)(n=len(prompt_batch))
             gen_args = dict(config.generate_gpt2.to_kwargs())
             gen_args["temperature"] = 1.0
             generated_output = direct.generate.generate(
-                _gen_model, tokenizer, [prompt] * batch_size, gen_lens, gen_args, config.device, True)
-
+                _gen_model, tokenizer, prompt_batch, gen_lens, gen_args, config.device, True)
             logprobs, response_mask, ref_logprobs = direct.model.batch_forward_pass(_gen_model, None, tokenizer,
                                                                                     generated_output.prompt_tokens, generated_output.completion_tokens)
 
-            h_sum += -((logprobs * response_mask).sum()).item() / batch_size
+            all_hs.extend((-((logprobs * response_mask).sum(dim=1))).tolist())
 
-        h = h_sum / (n // batch_size)
-        return h
+        assert(len(all_hs) % n == 0)
+        res = []
+        for s in range(len(all_hs) // n):
+            res.append(sum(all_hs[s:s+n]) / n)
+
+        assert(len(prompts) == len(res))
+
+        return res
+
 
     acquire_completion_pairs = dict(
         RANDOM=acquire_completion_pairs_random,
