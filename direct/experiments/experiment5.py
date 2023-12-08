@@ -179,6 +179,15 @@ def simple_training_loop(
                     completion_pair_generator.generate(next(i_prompt_dataloader), config.device, "cpu")
                 ))
                 pbar.update(len(new_data) - pbar.n)
+
+        # we can compute this here for interest - e.g. for later analysis to see how good a preference estimator r_hats are
+        print("Computing certainty scores using gen_model")
+        all_scores, all_rhats = compute_model_uncertainty(gen_model, gen_trainer.ref_model, gen_trainer.tokenizer, new_data,
+                                                          config.train.dpo.beta, config.train.batch_size, config.device)
+
+        for d, rhats in zip(new_data, all_rhats):
+            d["r_hats"] = rhats
+
         return new_data
 
     def acquire_completion_pairs_uncertainty(minimum_count, i_prompt_dataloader, which, over_generate_factor=1):
