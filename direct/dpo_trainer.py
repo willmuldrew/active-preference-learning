@@ -5,7 +5,6 @@ import torch
 from torch import Tensor
 from transformers import PreTrainedTokenizerBase, DataCollatorForLanguageModeling
 from trl import create_reference_model
-import bitsandbytes as bnb
 
 import direct.model
 from direct.config import ExperimentConfig
@@ -48,6 +47,7 @@ class DirectPreferenceTrainer:
         if self.config.train.optimizer == "Adam":
             return torch.optim.Adam(model.parameters(), lr=self.config.train.lr)
         elif self.config.train.optimizer == "PagedAdam8bit":
+            import bitsandbytes as bnb
             return bnb.optim.PagedAdam8bit(model.parameters(), lr=self.config.train.lr)
         else:
             raise NotImplementedError(f"Don't know how to create a {self.config.train.optimizer} instance")
