@@ -1,4 +1,4 @@
-Getting Started on Myriad
+Getting Started on Myriad/UCL CS Cluster
 -------------------------
 
 1. Install miniconda for python 3.10 to home directory (I hit some issues with 3.11 which I haven't yet fixed) - 
@@ -7,6 +7,7 @@ Getting Started on Myriad
     wget https://repo.anaconda.com/miniconda/Miniconda3-py310_23.5.0-3-Linux-x86_64.sh
     chmod u+x Miniconda3-py310_23.5.0-3-Linux-x86_64.sh
     ./Miniconda3-py310_23.5.0-3-Linux-x86_64.sh -b
+    ./miniconda3/bin/conda init
     # You may need to login/logout at this stage
     ```
 1. Clone repo to home directory and cd into it
@@ -37,6 +38,10 @@ Getting Started on Myriad
    Note that concurrent jobs will compete for OpenAI rate limits!  
    ```
    qsub sh/run-imdb2-myriad.sh
+   ```
+   or for the UCL CS cluster
+   ```
+   qsub sh/run-imdb2-pryor.sh
    ```
 1. Observe!
    ```
