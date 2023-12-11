@@ -7,6 +7,7 @@ Getting Started on Myriad
     wget https://repo.anaconda.com/miniconda/Miniconda3-py310_23.5.0-3-Linux-x86_64.sh
     chmod u+x Miniconda3-py310_23.5.0-3-Linux-x86_64.sh
     ./Miniconda3-py310_23.5.0-3-Linux-x86_64.sh -b
+    ./miniconda3/bin/conda init
     # You may need to login/logout at this stage
     ```
 1. Clone repo to home directory and cd into it
