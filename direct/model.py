@@ -35,6 +35,24 @@ def get_generative_model(config: ExperimentConfig) -> tuple[TModel, PreTrainedTo
     #  pad_token hack needed re: https://github.com/huggingface/transformers/issues/4122
     tokenizer.pad_token = tokenizer.eos_token
 
+    if config.exp5.use_lora:
+        from peft import LoraConfig, get_peft_model
+
+        config = LoraConfig(
+            r=8,
+            lora_alpha=16,
+#            target_modules=["c_attn", "c_proj", "mlp.c_fc"],
+#            lora_dropout=0.05,
+#            bias="none",
+            task_type="CAUSAL_LM",
+        )
+        print(f"--- Base model ---\n{model}")
+        model = get_peft_model(model, config)
+        print(f"--- LoRA model ---\n{model}")
+        # avoid a problem in the peft lib (or maybe I don't understand!)
+        model.generation_config = None
+        model.print_trainable_parameters()
+
     return model, tokenizer
 
 

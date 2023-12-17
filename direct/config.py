@@ -109,8 +109,15 @@ class Exp5Config:
     loss_ma_early_stopper_threshold: float = 0.1
     max_steps: int = None
     max_epochs: int = None
+    max_epoch_schedule: list[int] = None
+    no_reset: bool = False
     num_openai_threads: int = 1
     openai_provider: str = "openai"
+    use_lora: bool = False
+
+    def __post_init__(self):
+        if self.max_epoch_schedule is not None:
+            assert(len(self.max_epoch_schedule) == len(self.m_schedule))
 
 
 @dataclass

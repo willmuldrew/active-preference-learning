@@ -49,6 +49,8 @@ class DirectPreferenceTrainer:
         elif self.config.train.optimizer == "PagedAdam8bit":
             import bitsandbytes as bnb
             return bnb.optim.PagedAdam8bit(model.parameters(), lr=self.config.train.lr)
+        elif self.config.train.optimizer == "RMSprop":
+            return torch.optim.RMSprop(model.parameters(), lr=self.config.train.lr)
         else:
             raise NotImplementedError(f"Don't know how to create a {self.config.train.optimizer} instance")
 

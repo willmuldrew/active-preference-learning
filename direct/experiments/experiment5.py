@@ -37,7 +37,9 @@ def run(config: ExperimentConfig):
 
     gen_model, gen_tokenizer = get_generative_model(config)
 
-    gen_model.gradient_checkpointing_enable()
+    if not config.exp5.use_lora:
+        # LoRA appears not to work with checkpoint - it somehow doesn't realise that the lora matrices require grad..? hmm
+        gen_model.gradient_checkpointing_enable()
 
     preference_oracle = get_preference_oracle(config)
     gen_trainer = direct.dpo_trainer.DirectPreferenceTrainer(config, gen_model, gen_tokenizer)
@@ -101,7 +103,7 @@ def simple_training_loop(
             f"step: {scalar_stats['step']} epoch: {scalar_stats['epoch']} m: {scalar_stats['m']}",
             scalar_stats)
 
-    def train_to_convergence(_training_data):
+    def train_to_convergence(_training_data, i_phase):
         lr_scheduler = torch.optim.lr_scheduler.LinearLR(gen_trainer.optimizer,
                                                          start_factor=config.train.lr_ramp_start_factor,
                                                          total_iters=config.train.lr_ramp_total_iters)
@@ -131,6 +133,12 @@ def simple_training_loop(
                 if config.exp5.max_epochs is not None and config.exp5.max_epochs > 0:
                     if epoch > config.exp5.max_epochs:
                         print("STOPPING - reached max_epochs")
+                        stop = True
+                        break
+
+                if config.exp5.max_epoch_schedule is not None:
+                    if epoch > config.exp5.max_epoch_schedule[i_phase]:
+                        print("STOPPING - reached max_epoch_schedule[i_phase]")
                         stop = True
                         break
 
@@ -422,7 +430,7 @@ def simple_training_loop(
                 sample_temperature=t,
                 prefix=f"{prefix}/eval_T{t:0.2f}",
                 versus=config.eval.versus,
-                save_path=save_path + f"_T{t:0.2f}.json",
+                save_path=f"{save_path}_T{t:0.2f}.json" if save_path is not None else None,
             )
             if additional_stats is not None:
                 eval_stats.update(additional_stats)
@@ -439,7 +447,7 @@ def simple_training_loop(
     print("m_schedule", m_schedule)
     print("eval_m_schedule", eval_m_schedule)
 
-    for m in m_schedule:
+    for i_phase, m in enumerate(m_schedule):
         if config.exp5.reacquire_all_data:
             training_data.clear()
         training_data = expand_training_dataset(training_data, m, i_raw_prompt_dataloader)
@@ -452,13 +460,16 @@ def simple_training_loop(
                     json.dump(p, f, default=utils.tensor_serialize)
                     f.write("\n")
 
-        reset_model()
-        reset_optimizer()
+        if not config.exp5.no_reset:
+            reset_model()
+            reset_optimizer()
+
         if config.exp5.acquire_pairs_function == "OFFLINE" and m not in eval_m_schedule:
             print("Skipping training since we're OFFLINE and m not in eval_m_schedule")
             pass
         else:
-            train_to_convergence(training_data)
+            if m > 0:
+                train_to_convergence(training_data, i_phase)
         if m in eval_m_schedule:
             do_eval(f"post_training_m", save_path=maybe_get_eval_save_path(
                                         f"evaluation_m{len(training_data)}_post_training"), additional_stats={"m": m})
