@@ -95,35 +95,41 @@ def evaluate_model(model, ref_model, tokenizer, dataset,
                     vs_completions.extend(batch["label"])
 
         try:
-            scores = preference_oracle.get_scores(prompts, completions)
+            if not config.eval.defer:
+                scores = preference_oracle.get_scores(prompts, completions)
         except NotImplementedError:
             # Doesn't support scores... (i.e. only computes preference rank)
             pass
 
         if len(vs_completions) > 0:
-            vs_oracle_response = preference_oracle.consult_the_oracle(
-                prompts, [completions, vs_completions])
+            if config.eval.defer:
+                # Don't consult the oracle - we can do this post-training, but we still need to dump out our samples
+                vs_rows_cols = ["prompt", "completion", "completion_ref"]
+                vs_rows = [list(r) for r in zip(prompts, completions, vs_completions)]
+            else:
+                vs_oracle_response = preference_oracle.consult_the_oracle(
+                    prompts, [completions, vs_completions])
 
-            for r in vs_oracle_response.rank:
-                if r is None:  # couldn't decide... choose one at random
-                    vs_wins.append(random.choice([0, 1]))
-                else:
-                    vs_wins.append(1 if r[0] == 0 else 0)
-            # wins = [1 if r[0] == 0 else 0 for r in vs_oracle_response.rank]
+                for r in vs_oracle_response.rank:
+                    if r is None:  # couldn't decide... choose one at random
+                        vs_wins.append(random.choice([0, 1]))
+                    else:
+                        vs_wins.append(1 if r[0] == 0 else 0)
+                # wins = [1 if r[0] == 0 else 0 for r in vs_oracle_response.rank]
 
-            vs_rows_cols = ["prompt", "completion", "completion_ref", "win"]
-            vs_rows = [list(r) for r in zip(
-                prompts, completions, vs_completions, vs_wins)]
+                vs_rows_cols = ["prompt", "completion", "completion_ref", "win"]
+                vs_rows = [list(r) for r in zip(
+                    prompts, completions, vs_completions, vs_wins)]
 
-            if vs_oracle_response.score is not None:
-                vs_rows_cols.extend(["score", "score_ref"])
-                for r, s in zip(vs_rows, vs_oracle_response.score):
-                    r.extend([s[0], s[1]])
+                if vs_oracle_response.score is not None:
+                    vs_rows_cols.extend(["score", "score_ref"])
+                    for r, s in zip(vs_rows, vs_oracle_response.score):
+                        r.extend([s[0], s[1]])
 
-            if vs_oracle_response.rationale is not None:
-                vs_rows_cols.extend(["rationale"])
-                for r, s in zip(vs_rows, vs_oracle_response.rationale):
-                    r.append(s)
+                if vs_oracle_response.rationale is not None:
+                    vs_rows_cols.extend(["rationale"])
+                    for r, s in zip(vs_rows, vs_oracle_response.rationale):
+                        r.append(s)
 
     if scores is not None:
         scores = torch.Tensor(scores)
@@ -144,7 +150,8 @@ def evaluate_model(model, ref_model, tokenizer, dataset,
     })
 
     if versus is not None:
-        results[f"{prefix}/win_rate_vs_{versus}"] = sum(vs_wins) / len(vs_wins)
+        if len(vs_wins) > 0:
+            results[f"{prefix}/win_rate_vs_{versus}"] = sum(vs_wins) / len(vs_wins)
         results[f"{prefix}/vs_rows_vs_{versus}"] = wandb.Table(
             columns=vs_rows_cols,
             rows=vs_rows)
@@ -154,8 +161,11 @@ def evaluate_model(model, ref_model, tokenizer, dataset,
             prompts=prompts,
             completions=completions,
             vs_completions=vs_completions,
-            vs_wins=vs_wins,
         )
+
+        if len(vs_wins) > 0:
+            o["vs_wins"] = vs_wins
+
         with open(save_path, "w") as f:
             json_tricks.dump(o, f, indent=4)
         print(f"Written evaluation inputs and results to {save_path}")
