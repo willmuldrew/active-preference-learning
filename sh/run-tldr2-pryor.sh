@@ -1,6 +1,7 @@
 #!/bin/bash -l 
       
-#$ -l h_rt=20:00:00
+#############$ -l h_rt=20:00:00
+
 #$ -l gpu=true,gpu_type=(a100|a100_80|a100_dgx)
 #$ -l tmem=10G
 #$ -N tldr2 
@@ -39,8 +40,9 @@ export PYTHONPATH=.
 PYTHON=./venv/bin/python3
 #PYTHON=echo
 
-M_SCHEDULE="[128,256,384,512]"
-EVAL_SCHEDULE="[512]"
+M_SCHEDULE="[0,128,256,384,512]"
+# Okay since we're deferring eval - just going to dump samples 
+EVAL_SCHEDULE=$M_SCHEDULE
 
 # NOTE - provide SEEDS on the command line via an environment variable
 #SEEDS="42 41697 29716"
@@ -48,7 +50,7 @@ EVAL_TEST_SET_SIZE=1024
 
 SHARED_ARGS="--experiment_name exp5 \
 --log true --wandb_project wm-debug-tldr \
---data.dataset_name tldr --exp5.prompt_batch_size 32 \
+--data.dataset_name tldr --exp5.prompt_batch_size 16 \
 --data.truncate_prompts false \
 --data.completion_min_len 128 --data.completion_max_len 128 \
 --model_class gpt-neox --model_instance pvduy/pythia-1B-sft-summarize-tldr \
@@ -70,8 +72,8 @@ CERTAINTY_ARGS="--exp5.acquire_pairs_function CERTAINTY --exp5.over_generate_fac
 UNCERTAINTY_ARGS="--exp5.acquire_pairs_function UNCERTAINTY --exp5.over_generate_factor 16"
 # ~30 hours
 ENTROPY_ARGS="--exp5.acquire_pairs_function ENTROPY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 16"
-HIGH_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function HIGH_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 16 --exp5.over_generate_factor 8"
-LOW_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function LOW_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 16 --exp5.over_generate_factor 8"
+HIGH_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function HIGH_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 8 --exp5.over_generate_factor 16"
+LOW_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function LOW_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 8 --exp5.over_generate_factor 16"
 
 
 BETA=0.2
@@ -83,5 +85,5 @@ if [ -z "$ADDITIONAL_ARGS" ]; then
   exit 1
 fi
 
-$PYTHON direct/main.py --seed $SEED --train.dpo.beta $BETA $SHARED_ARGS $ADDITIONAL_ARGS 
+$PYTHON direct/main.py --seed $SEED --eval.defer true --wandb_tags xmas-sweep2 --train.dpo.beta $BETA $SHARED_ARGS $ADDITIONAL_ARGS 
 

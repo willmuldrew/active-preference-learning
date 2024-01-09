@@ -1,6 +1,9 @@
 #!/bin/bash -l 
-      
-#$ -l h_rt=40:00:00
+
+# Provide this on the qsub command line 
+###### -l h_rt=5:00:00
+
+
 #$ -l gpu=true,gpu_type=(a100|a100_80|a100_dgx)
 #$ -l tmem=10G
 #$ -N imdb2
@@ -40,11 +43,12 @@ PYTHON=./venv/bin/python3
 #PYTHON=echo
 
 M_SCHEDULE="[128,256,384,512,640,768]"
-EVAL_SCHEDULE="[768]"
+# Okay since we're deferring eval - just going to dump samples 
+EVAL_SCHEDULE=$M_SCHEDULE
 
 # NOTE - provide SEEDS on the command line via an environment variable
 #SEEDS="42 41697 29716"
-EVAL_TEST_SET_SIZE=512
+EVAL_TEST_SET_SIZE=1024
 
 SHARED_ARGS="--experiment_name exp5 \
 --log true --wandb_project wm-debug-imdb \
@@ -64,12 +68,12 @@ SHARED_ARGS="--experiment_name exp5 \
 
 
 OFFLINE_ARGS="--exp5.acquire_pairs_function OFFLINE --exp5.over_generate_factor 1"
-ENTROPY_ARGS="--exp5.acquire_pairs_function ENTROPY --exp5.over_sample_prompts_factor 16 --exp5.entropy_sample_n 16"
+ENTROPY_ARGS="--exp5.acquire_pairs_function ENTROPY --exp5.over_sample_prompts_factor 16 --exp5.entropy_sample_n 8"
 RANDOM_ARGS="--exp5.acquire_pairs_function RANDOM --exp5.over_generate_factor 1"
 CERTAINTY_ARGS="--exp5.acquire_pairs_function CERTAINTY --exp5.over_generate_factor 32"
 UNCERTAINTY_ARGS="--exp5.acquire_pairs_function UNCERTAINTY --exp5.over_generate_factor 32"
-HIGH_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function HIGH_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 8 --exp5.entropy_sample_n 16 --exp5.over_generate_factor 32"
-LOW_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function LOW_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 8 --exp5.entropy_sample_n 16 --exp5.over_generate_factor 32"
+HIGH_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function HIGH_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 8 --exp5.entropy_sample_n 8 --exp5.over_generate_factor 32"
+LOW_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function LOW_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 8 --exp5.entropy_sample_n 8 --exp5.over_generate_factor 32"
 
 
 BETA=0.2
@@ -81,5 +85,5 @@ if [ -z "$ADDITIONAL_ARGS" ]; then
   exit 1
 fi
 
-$PYTHON direct/main.py --seed $SEED --train.dpo.beta $BETA $SHARED_ARGS $ADDITIONAL_ARGS 
+$PYTHON direct/main.py --seed $SEED --eval.defer true --wandb_tags xmas-sweep2 --train.dpo.beta $BETA $SHARED_ARGS $ADDITIONAL_ARGS 
 
