@@ -1,5 +1,7 @@
 #!/bin/bash -l 
-      
+
+# run like: CUDA_VISIBLE_DEVICES=0 MODE=HIGH_ENTROPY_AND_CERTAINTY SEED=12029 sh/run-tldr2-runpod.sh
+
 
 export PYTHONPATH=.
 PYTHON=python3
