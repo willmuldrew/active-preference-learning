@@ -98,6 +98,13 @@ class Exp4Config:
 
 
 @dataclass
+class LoraConfig:
+    rank: int = 8
+    alpha: int = 16
+    dropout: float = 0.0
+
+
+@dataclass
 class Exp5Config:
     m_schedule: list[int] = None
     eval_m_schedule: list[int] = None
@@ -152,3 +159,5 @@ class ExperimentConfig:
     exp4: Exp4Config = Exp4Config()
     exp5: Exp5Config = Exp5Config()
     openai_request_log_path: str = "openai_request_log.jsonl"
+    lora: LoraConfig = LoraConfig()
+

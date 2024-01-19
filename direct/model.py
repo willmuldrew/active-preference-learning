@@ -39,13 +39,12 @@ def get_generative_model(config: ExperimentConfig) -> tuple[TModel, PreTrainedTo
         from peft import LoraConfig, get_peft_model
 
         config = LoraConfig(
-            r=8,
-            lora_alpha=16,
-#            target_modules=["c_attn", "c_proj", "mlp.c_fc"],
-#            lora_dropout=0.05,
-#            bias="none",
+            r=config.lora.rank,
+            lora_alpha=config.lora.alpha,
+            lora_dropout=config.lora.dropout,
             task_type="CAUSAL_LM",
         )
+
         print(f"--- Base model ---\n{model}")
         model = get_peft_model(model, config)
         print(f"--- LoRA model ---\n{model}")
