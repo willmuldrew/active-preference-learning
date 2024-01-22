@@ -14,7 +14,7 @@ def load_prompt_dataset(tokenizer: PreTrainedTokenizerBase, config: ExperimentCo
                            ("test", config.data.limit_test_n)]:
 
         if config.data.dataset_name == "imdb":
-            dataset = load_dataset("imdb", split=split)
+            dataset = load_dataset("imdb", split=split, verification_mode="no_checks")
             dataset = dataset.rename_columns({"text": "prompt"})
             dataset = dataset.filter(lambda x: len(x["prompt"]) > 200, batched=False)
         elif config.data.dataset_name == "tldr":
