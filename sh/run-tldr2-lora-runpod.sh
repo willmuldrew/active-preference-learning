@@ -25,7 +25,7 @@ SHARED_ARGS="--experiment_name exp5 \
 --pref_model_class openai --pref_model_instance tldr-gpt-4-1106-preview \
 --generate_gpt2.temperature 0.7 \
 --exp5.m_schedule $M_SCHEDULE --exp5.eval_m_schedule $EVAL_SCHEDULE \
---exp5.loss_ma_early_stopper_threshold 0.0 --exp5.max_epochs 12 \
+--exp5.loss_ma_early_stopper_threshold 0.0 \
 --train.optimizer RMSprop 
 --eval.versus label
 --exp5.use_lora true
@@ -36,15 +36,15 @@ SHARED_ARGS="--experiment_name exp5 \
 
 
 # < 8 hours (or less)
-OFFLINE_ARGS="--exp5.acquire_pairs_function OFFLINE --exp5.over_generate_factor 1"
+# OFFLINE_ARGS="--exp5.acquire_pairs_function OFFLINE --exp5.over_generate_factor 1"
 # 16 hours
-RANDOM_ARGS="--exp5.acquire_pairs_function RANDOM --exp5.over_generate_factor 1"
-CERTAINTY_ARGS="--exp5.acquire_pairs_function CERTAINTY --exp5.over_generate_factor 16"
-UNCERTAINTY_ARGS="--exp5.acquire_pairs_function UNCERTAINTY --exp5.over_generate_factor 16"
+RANDOM_ARGS="--exp5.acquire_pairs_function RANDOM --exp5.over_generate_factor 1 --exp5.max_epochs 12"
+CERTAINTY_ARGS="--exp5.acquire_pairs_function CERTAINTY --exp5.over_generate_factor 16 --exp5.max_epochs 26"
+# UNCERTAINTY_ARGS="--exp5.acquire_pairs_function UNCERTAINTY --exp5.over_generate_factor 16"
 # ~30 hours
-ENTROPY_ARGS="--exp5.acquire_pairs_function ENTROPY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 16"
-HIGH_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function HIGH_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 8 --exp5.over_generate_factor 16"
-LOW_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function LOW_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 8 --exp5.over_generate_factor 16"
+# ENTROPY_ARGS="--exp5.acquire_pairs_function ENTROPY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 16"
+# HIGH_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function HIGH_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 8 --exp5.over_generate_factor 16"
+# LOW_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function LOW_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 8 --exp5.over_generate_factor 16"
 
 
 BETA=0.2
