@@ -28,6 +28,7 @@ def evaluate_model(model, ref_model, tokenizer, dataset,
     with utils.timeit(f"{prefix}/time", results):
         test_dataloader = torch.utils.data.DataLoader(dataset, batch_size=config.eval.batch_size, shuffle=shuffle_data)
 
+        print(f"evaluate_model: model {utils.hash_model_weights(model)}, ref_model {utils.hash_model_weights(ref_model)}")
         if num_batches is not None:
             print(f"Doing '{prefix}' eval with {num_batches} batches of size {config.eval.batch_size} "
                   f"drawn from dataset of size {len(dataset)} - T={sample_temperature}")

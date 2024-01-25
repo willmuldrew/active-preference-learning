@@ -7,6 +7,7 @@ from contextlib import contextmanager
 
 import numpy as np
 import torch
+import hashlib
 
 import pynvml
 
@@ -197,3 +198,14 @@ def tensor_serialize(obj):
         return obj.tolist()
     raise TypeError("Type not serializable")
 
+
+def hash_model_weights(model):
+    hash_sha256 = hashlib.sha256()
+
+    # Iterate over model parameters and update hash
+    for param in model.parameters():
+        # Use param.data to ensure gradients are not included
+        hash_sha256.update(param.data.cpu().numpy().tobytes())
+
+    # Return the hexadecimal digest
+    return hash_sha256.hexdigest()

@@ -73,9 +73,12 @@ def simple_training_loop(
         test_prompt_dataset,
         preference_oracle, step_fn
 ):
+    print(f"simple_training_loop called with gen_model {utils.hash_model_weights(gen_model)}")
     source_model = gen_model
     if config.exp5.acquire_pairs_function == "OFFLINE":
         source_model = gen_trainer.ref_model
+
+    original_ref_model_state = {k: v.cpu() for k, v in gen_trainer.ref_model.state_dict().items()}
 
     completion_pair_generator = direct.generate.CompletionSetGenerator(
         source_model, gen_tokenizer,
@@ -104,6 +107,7 @@ def simple_training_loop(
             scalar_stats)
 
     def train_to_convergence(_training_data, i_phase):
+        print(f"train_to_convergence w/ model {utils.hash_model_weights(gen_trainer.model)}, ref_model {utils.hash_model_weights(gen_trainer.ref_model)}")
         lr_scheduler = torch.optim.lr_scheduler.LinearLR(gen_trainer.optimizer,
                                                          start_factor=config.train.lr_ramp_start_factor,
                                                          total_iters=config.train.lr_ramp_total_iters)
@@ -176,10 +180,14 @@ def simple_training_loop(
             if early_stopper.should_stop():
                 break
 
+        print(f"train_to_convergence finished: model {utils.hash_model_weights(gen_trainer.model)}, ref_model {utils.hash_model_weights(gen_trainer.ref_model)}")
+
     def acquire_completion_pairs_random(minimum_count, i_prompt_dataloader):
         """
         NB: May return more than minimum_count...
         """
+        print(f"acquire_completion_pairs_random: model {utils.hash_model_weights(completion_pair_generator.model)}")
+
         new_data = []
         with tqdm(total=minimum_count, desc=f"generating {minimum_count} datapoints using RANDOM") as pbar:
             while len(new_data) < minimum_count:
@@ -419,6 +427,10 @@ def simple_training_loop(
         return current_dataset
 
     def do_eval(prefix, save_path=None, additional_stats=None):
+        # current_ref_model_state = gen_trainer.ref_model.state_dict()
+        current_ref_model_state = {k: v.cpu() for k, v in gen_trainer.ref_model.state_dict().items()}
+        gen_trainer.ref_model.load_state_dict(original_ref_model_state)
+
         for t in config.eval.sampling_temperatures:
             eval_stats = evaluate_model(
                 gen_model,
@@ -437,6 +449,8 @@ def simple_training_loop(
             print("EVAL:", {k: v for (k, v) in eval_stats.items() if is_scalar(v)})
             if config.log:
                 wandb.log(eval_stats)
+
+        gen_trainer.ref_model.load_state_dict(current_ref_model_state)
 
     i_raw_prompt_dataloader = iter(itertools.cycle(prompt_dataloader))
 
@@ -460,7 +474,11 @@ def simple_training_loop(
                     json.dump(p, f, default=utils.tensor_serialize)
                     f.write("\n")
 
-        if not config.exp5.no_reset:
+        if config.exp5.no_reset:
+            reset_optimizer()
+            gen_trainer.ref_model.load_state_dict(gen_model.state_dict())
+            gen_trainer.ref_model.eval()
+        else:
             reset_model()
             reset_optimizer()
 
@@ -472,7 +490,7 @@ def simple_training_loop(
                 train_to_convergence(training_data, i_phase)
         if m in eval_m_schedule:
             do_eval(f"post_training_m", save_path=maybe_get_eval_save_path(
-                                        f"evaluation_m{len(training_data)}_post_training"), additional_stats={"m": m})
+                                        f"evaluation_m{len(training_data)}_phase{i_phase}_post_training"), additional_stats={"m": m})
 
         # if wandb.run.dir is not None:
         #     checkpoint_dir = os.path.join(wandb.run.dir, f"checkpoint_final_m{m}")
