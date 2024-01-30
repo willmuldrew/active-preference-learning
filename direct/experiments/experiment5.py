@@ -497,8 +497,9 @@ def simple_training_loop(
 
         if config.exp5.no_reset:
             reset_optimizer()
-            gen_trainer.ref_model.load_state_dict(gen_model.state_dict())
-            gen_trainer.ref_model.eval()
+            if config.exp5.update_ref_model:
+                gen_trainer.ref_model.load_state_dict(gen_model.state_dict())
+                gen_trainer.ref_model.eval()
         else:
             reset_model()
             reset_optimizer()

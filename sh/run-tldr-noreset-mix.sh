@@ -32,6 +32,7 @@ SHARED_ARGS="--experiment_name exp5 \
 --eval.versus label
 --exp5.num_openai_threads 10
 --exp5.no_reset true
+--exp5.update_ref_model false
 --exp5.mix_data true
 --exp5.mix_data_m 128
 --exp5.mix_data_r 0.5"

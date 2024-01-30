@@ -125,6 +125,7 @@ class Exp5Config:
     mix_data: bool = False
     mix_data_m: Optional[int] = None
     mix_data_r: Optional[float] = None
+    update_ref_model: bool = False
 
     def __post_init__(self):
         if self.max_epoch_schedule is not None:
