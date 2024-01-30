@@ -65,6 +65,19 @@ def is_scalar(v):
         return isinstance(v, (int, float, bool, complex, np.generic))
 
 
+def sample_mixed_data(data, mix_data_m, mix_data_r):
+    max_phase = max(d["phase"] for d in data)
+    phase_weights = {max_phase: 1.0}
+    for p in range(max_phase - 1, -1, -1):
+        phase_weights[p] = phase_weights[p+1] * (mix_data_r + 1) / (phase_weights[p+1] + 1)
+
+    print(phase_weights)
+
+    w = np.array([phase_weights[d["phase"]] for d in data])
+    w /= w.sum()
+    return np.random.choice(data, mix_data_m, replace=False, p=w)
+
+
 def simple_training_loop(
         config,
         gen_trainer,
@@ -114,8 +127,6 @@ def simple_training_loop(
 
         early_stopper = direct.utils.LossMAEarlyStopper(threshold=config.exp5.loss_ma_early_stopper_threshold)
 
-        train_dl = torch.utils.data.DataLoader(_training_data, config.train.effective_batch_size, collate_fn=utils.records_to_cols, shuffle=True)
-
         # Need to do this since gradient checkpointing won't be done without being in the right mode
         gen_trainer.model.train()
 
@@ -124,6 +135,15 @@ def simple_training_loop(
         epoch = -1
         while not stop:
             epoch += 1
+
+            if config.exp5.mix_data:
+                mixed_data = sample_mixed_data(_training_data, config.exp5.mix_data_m, config.exp5.mix_data_r)
+                train_dl = torch.utils.data.DataLoader(mixed_data, config.train.effective_batch_size,
+                                                       collate_fn=utils.records_to_cols, shuffle=True)
+            else:
+                train_dl = torch.utils.data.DataLoader(_training_data, config.train.effective_batch_size,
+                                                       collate_fn=utils.records_to_cols, shuffle=True)
+
             for batch in train_dl:
                 torch.cuda.reset_peak_memory_stats()
                 step += 1
@@ -397,7 +417,7 @@ def simple_training_loop(
         drop_last=True,
     )
 
-    def expand_training_dataset(current_dataset, target_m, i_prompt_dataloader):
+    def expand_training_dataset(current_dataset, target_m, i_prompt_dataloader, i_phase):
         print(f"Expanding dataset from {len(current_dataset)} to {target_m}")
         current_dataset = list(current_dataset)
         while len(current_dataset) < target_m:
@@ -420,6 +440,7 @@ def simple_training_loop(
                     print(f"dropping datapoint from from batch: {d['prompt']}\n,A: {d['completion_0']}\n,B: {d['completion_1']}\nRATIONALE:{d['rationale']}")
                 else:
                     d["target_m"] = target_m
+                    d["phase"] = i_phase
                     current_dataset.append(d)
 
         current_dataset = current_dataset[:target_m]
@@ -464,7 +485,7 @@ def simple_training_loop(
     for i_phase, m in enumerate(m_schedule):
         if config.exp5.reacquire_all_data:
             training_data.clear()
-        training_data = expand_training_dataset(training_data, m, i_raw_prompt_dataloader)
+        training_data = expand_training_dataset(training_data, m, i_raw_prompt_dataloader, i_phase)
 
         if wandb.run.dir is not None:
             data_dump_path = os.path.join(wandb.run.dir, f"training_data_m{m}.jsonl")

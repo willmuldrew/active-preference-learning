@@ -122,6 +122,9 @@ class Exp5Config:
     num_openai_threads: int = 1
     openai_provider: str = "openai"
     use_lora: bool = False
+    mix_data: bool = False
+    mix_data_m: Optional[int] = None
+    mix_data_r: Optional[float] = None
 
     def __post_init__(self):
         if self.max_epoch_schedule is not None:
