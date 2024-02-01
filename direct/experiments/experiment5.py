@@ -65,15 +65,35 @@ def is_scalar(v):
         return isinstance(v, (int, float, bool, complex, np.generic))
 
 
+def get_weights(r, max_phase):
+    phase_weights = {0: 1.0}
+    for p in range(1, max_phase + 1):
+        phase_weights[p] = (r + 1) * phase_weights[p-1] / (phase_weights[p-1] + 1)
+
+    return phase_weights
+
+
+def compute_probabilities(weights):
+    max_phase = max(weights.keys())
+    tot = 0
+    res = {}
+    for p in range(max_phase, -1, -1):
+        res[p] = (1 - tot) * weights[p]
+        tot += res[p]
+
+    assert(np.isclose(1.0, sum(res.values())))
+
+    return res
+
+
 def sample_mixed_data(data, mix_data_m, mix_data_r):
-    max_phase = max(d["phase"] for d in data)
-    phase_weights = {max_phase: 1.0}
-    for p in range(max_phase - 1, -1, -1):
-        phase_weights[p] = phase_weights[p+1] * (mix_data_r + 1) / (phase_weights[p+1] + 1)
+    phase_weights = get_weights(mix_data_r, max(d["phase"] for d in data))
 
-    print(phase_weights)
+    # print(phase_weights)
+    phase_prob = compute_probabilities(phase_weights)
+    # print(phase_prob)
 
-    w = np.array([phase_weights[d["phase"]] for d in data])
+    w = np.array([phase_prob[d["phase"]] for d in data])
     w /= w.sum()
     return np.random.choice(data, mix_data_m, replace=False, p=w)
 
