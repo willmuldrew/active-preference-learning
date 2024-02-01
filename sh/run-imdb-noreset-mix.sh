@@ -35,7 +35,7 @@ SHARED_ARGS="--experiment_name exp5 \
 --exp5.update_ref_model false
 --exp5.mix_data true
 --exp5.mix_data_m 128
---exp5.mix_data_r MIX_R"
+--exp5.mix_data_r $MIX_R"
 
 
 RANDOM_ARGS="--exp5.acquire_pairs_function RANDOM --exp5.over_generate_factor 1"
