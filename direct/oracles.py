@@ -125,7 +125,9 @@ class LocalHuggingFacePreferenceOracle(PreferenceOracle):
 
 
 def get_preference_oracle(config: ExperimentConfig) -> PreferenceOracle:
-    if config.pref_model_class == "dummy" and config.pref_model_instance.startswith("tldr-wordcount"):
+    if (config.pref_model_class == "dummy" and
+            (config.pref_model_instance.startswith("tldr-wordcount") or
+             config.pref_model_instance.startswith("imdb-wordcount"))):
         print("Using dummy wordcount preference 'oracle'")
         return DummyStringLengthPreferenceOracle(42)
     elif config.pref_model_class == "openai":

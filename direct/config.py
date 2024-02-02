@@ -27,6 +27,7 @@ class TrainerConfig:
     lr: float = 1.41e-5
     lr_ramp_start_factor: float = 1.0
     lr_ramp_total_iters: int = 1
+    optimizer: str = "Adam"
     batch_size: int = 256
     grad_acc_steps: int = 1
     # WJM - this is Peter's hack to disable KL (i.e. the P in PPO!)... seems to
@@ -59,8 +60,9 @@ class EvalConfig:
     test_set_size: int = 4096
     batch_size: int = 32
     perform_final_full_eval: bool = False
-    vs_ref_model_eval: bool = False
+    versus: str = "ref_model"  # can also be 'label'
     sampling_temperatures: list[float] = field(default_factory=lambda: [1.0, 0.7, 0.0])
+    defer: bool = False
 
 
 @dataclass
@@ -96,6 +98,13 @@ class Exp4Config:
 
 
 @dataclass
+class LoraConfig:
+    rank: int = 8
+    alpha: int = 16
+    dropout: float = 0.0
+
+
+@dataclass
 class Exp5Config:
     m_schedule: list[int] = None
     eval_m_schedule: list[int] = None
@@ -108,8 +117,19 @@ class Exp5Config:
     loss_ma_early_stopper_threshold: float = 0.1
     max_steps: int = None
     max_epochs: int = None
+    max_epoch_schedule: list[int] = None
+    no_reset: bool = False
     num_openai_threads: int = 1
     openai_provider: str = "openai"
+    use_lora: bool = False
+    mix_data: bool = False
+    mix_data_m: Optional[int] = None
+    mix_data_r: Optional[float] = None
+    update_ref_model: bool = False
+
+    def __post_init__(self):
+        if self.max_epoch_schedule is not None:
+            assert(len(self.max_epoch_schedule) == len(self.m_schedule))
 
 
 @dataclass
@@ -143,3 +163,5 @@ class ExperimentConfig:
     exp4: Exp4Config = Exp4Config()
     exp5: Exp5Config = Exp5Config()
     openai_request_log_path: str = "openai_request_log.jsonl"
+    lora: LoraConfig = LoraConfig()
+

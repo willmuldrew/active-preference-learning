@@ -40,12 +40,20 @@ class DirectPreferenceTrainer:
         self.optimizer = self.initialise_optimizer(self.model)
 
     def initialise_optimizer(self, model):
-        # import bitsandbytes as bnb
-        # return bnb.optim.Adam8bit(model.parameters(), lr=self.config.train.lr)
+        # return bnb.optim.PagedAdam8bit(model.parameters(), lr=self.config.train.lr)
         # return bnb.optim.RMSprop8bit(model.parameters(), lr=self.config.train.lr)
         # TODO: investigate other optimisers - DPO reference code suggests that RMSProp can be used without significant
         #       impact
-        return torch.optim.Adam(model.parameters(), lr=self.config.train.lr)
+        if self.config.train.optimizer == "Adam":
+            return torch.optim.Adam(model.parameters(), lr=self.config.train.lr)
+        elif self.config.train.optimizer == "PagedAdam8bit":
+            import bitsandbytes as bnb
+            return bnb.optim.PagedAdam8bit(model.parameters(), lr=self.config.train.lr)
+        elif self.config.train.optimizer == "RMSprop":
+            return torch.optim.RMSprop(model.parameters(), lr=self.config.train.lr)
+        else:
+            raise NotImplementedError(f"Don't know how to create a {self.config.train.optimizer} instance")
+
 
     def loss(self,
              logprobs_w: Tensor, response_mask_w: Tensor, ref_logprobs_w: Tensor,
@@ -78,6 +86,7 @@ class DirectPreferenceTrainer:
             self.model, self.ref_model, self.tokenizer,
             [t.to(self.config.device) for t in query_tokens],  # list of ragged prompts, no padding
             [t.to(self.config.device) for t in response_tokens],  # list of ragged responses, no padding
+            use_cache=not self.model.is_gradient_checkpointing
         )
 
     def step_pairs(self, batch_pairs, grad_acc_steps: int):
@@ -120,6 +129,8 @@ class DirectPreferenceTrainer:
 
             loss.backward()
             losses.append(loss.item())
+            # bit hacky, but keeps a lid on VRAM usage
+            torch.cuda.empty_cache()
 
         self.optimizer.step()
         self.optimizer.zero_grad()
