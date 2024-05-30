@@ -38,7 +38,8 @@ RANDOM_ARGS="--exp5.acquire_pairs_function RANDOM --exp5.over_generate_factor 1"
 CERTAINTY_ARGS="--exp5.acquire_pairs_function CERTAINTY --exp5.over_generate_factor 16"
 UNCERTAINTY_ARGS="--exp5.acquire_pairs_function UNCERTAINTY --exp5.over_generate_factor 16"
 # ~30 hours
-ENTROPY_ARGS="--exp5.acquire_pairs_function ENTROPY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 16"
+HIGH_ENTROPY_ARGS="--exp5.acquire_pairs_function HIGH_ENTROPY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 8"
+LOW_ENTROPY_ARGS="--exp5.acquire_pairs_function LOW_ENTROPY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 8"
 HIGH_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function HIGH_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 8 --exp5.over_generate_factor 16"
 LOW_ENTROPY_AND_CERTAINTY_ARGS="--exp5.acquire_pairs_function LOW_ENTROPY_AND_CERTAINTY --exp5.over_sample_prompts_factor 4 --exp5.entropy_sample_n 8 --exp5.over_generate_factor 16"
 
