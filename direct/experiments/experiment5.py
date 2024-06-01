@@ -65,15 +65,35 @@ def is_scalar(v):
         return isinstance(v, (int, float, bool, complex, np.generic))
 
 
+def get_weights(r, max_phase):
+    phase_weights = {0: 1.0}
+    for p in range(1, max_phase + 1):
+        phase_weights[p] = (r + 1) * phase_weights[p-1] / (phase_weights[p-1] + 1)
+
+    return phase_weights
+
+
+def compute_probabilities(weights):
+    max_phase = max(weights.keys())
+    tot = 0
+    res = {}
+    for p in range(max_phase, -1, -1):
+        res[p] = (1 - tot) * weights[p]
+        tot += res[p]
+
+    assert(np.isclose(1.0, sum(res.values())))
+
+    return res
+
+
 def sample_mixed_data(data, mix_data_m, mix_data_r):
-    max_phase = max(d["phase"] for d in data)
-    phase_weights = {max_phase: 1.0}
-    for p in range(max_phase - 1, -1, -1):
-        phase_weights[p] = phase_weights[p+1] * (mix_data_r + 1) / (phase_weights[p+1] + 1)
+    phase_weights = get_weights(mix_data_r, max(d["phase"] for d in data))
 
-    print(phase_weights)
+    # print(phase_weights)
+    phase_prob = compute_probabilities(phase_weights)
+    # print(phase_prob)
 
-    w = np.array([phase_weights[d["phase"]] for d in data])
+    w = np.array([phase_prob[d["phase"]] for d in data])
     w /= w.sum()
     return np.random.choice(data, mix_data_m, replace=False, p=w)
 
@@ -136,6 +156,11 @@ def simple_training_loop(
         while not stop:
             epoch += 1
 
+            if config.exp5.max_epochs is not None and config.exp5.max_epochs > 0:
+                if epoch >= config.exp5.max_epochs:
+                    print("STOPPING - reached max_epochs")
+                    break
+
             if config.exp5.mix_data:
                 mixed_data = sample_mixed_data(_training_data, config.exp5.mix_data_m, config.exp5.mix_data_r)
                 train_dl = torch.utils.data.DataLoader(mixed_data, config.train.effective_batch_size,
@@ -154,11 +179,11 @@ def simple_training_loop(
                         stop = True
                         break
 
-                if config.exp5.max_epochs is not None and config.exp5.max_epochs > 0:
-                    if epoch > config.exp5.max_epochs:
-                        print("STOPPING - reached max_epochs")
-                        stop = True
-                        break
+                # if config.exp5.max_epochs is not None and config.exp5.max_epochs > 0:
+                #     if epoch > config.exp5.max_epochs:
+                #         print("STOPPING - reached max_epochs")
+                #         stop = True
+                #         break
 
                 if config.exp5.max_epoch_schedule is not None:
                     if epoch > config.exp5.max_epoch_schedule[i_phase]:
@@ -476,13 +501,21 @@ def simple_training_loop(
     i_raw_prompt_dataloader = iter(itertools.cycle(prompt_dataloader))
 
     training_data = []
-    m_schedule = config.exp5.m_schedule
-    eval_m_schedule = config.exp5.eval_m_schedule or m_schedule
+    if config.exp5.m_schedule is not None:
+        m_schedule = config.exp5.m_schedule
+        if config.exp5.eval_m_schedule is not None:
+            eval_schedule = [m in config.exp5.eval_m_schedule for m in m_schedule]
+        else:
+            eval_schedule = [True] * len(m_schedule)
+
+    elif config.exp5.fixed_m is not None:
+        m_schedule = [config.exp5.fixed_m] * config.exp5.max_phases
+        eval_schedule = [m % config.exp5.eval_interval == 0 for m in range(len(m_schedule))]
 
     print("m_schedule", m_schedule)
-    print("eval_m_schedule", eval_m_schedule)
+    print("eval_m_schedule", eval_schedule)
 
-    for i_phase, m in enumerate(m_schedule):
+    for i_phase, (m, need_eval) in enumerate(zip(m_schedule, eval_schedule)):
         if config.exp5.reacquire_all_data:
             training_data.clear()
         training_data = expand_training_dataset(training_data, m, i_raw_prompt_dataloader, i_phase)
@@ -504,15 +537,15 @@ def simple_training_loop(
             reset_model()
             reset_optimizer()
 
-        if config.exp5.acquire_pairs_function == "OFFLINE" and m not in eval_m_schedule:
-            print("Skipping training since we're OFFLINE and m not in eval_m_schedule")
+        if config.exp5.acquire_pairs_function == "OFFLINE" and not need_eval and not config.exp5.no_reset:
+            print("Skipping training since we're OFFLINE and m not evaluating, and we're reseting the model anyway!")
             pass
         else:
             if m > 0:
                 train_to_convergence(training_data, i_phase)
-        if m in eval_m_schedule:
+        if need_eval:
             do_eval(f"post_training_m", save_path=maybe_get_eval_save_path(
-                                        f"evaluation_m{len(training_data)}_phase{i_phase}_post_training"), additional_stats={"m": m})
+                                        f"evaluation_m{len(training_data)}_phase{i_phase}_post_training"), additional_stats={"m": m, "i_phase": i_phase})
 
         # if wandb.run.dir is not None:
         #     checkpoint_dir = os.path.join(wandb.run.dir, f"checkpoint_final_m{m}")

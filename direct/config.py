@@ -126,6 +126,10 @@ class Exp5Config:
     mix_data_m: Optional[int] = None
     mix_data_r: Optional[float] = None
     update_ref_model: bool = False
+    # These are for the DAP-like training
+    fixed_m: Optional[int] = None
+    eval_interval: Optional[int] = None
+    max_phases: Optional[int] = None
 
     def __post_init__(self):
         if self.max_epoch_schedule is not None:
