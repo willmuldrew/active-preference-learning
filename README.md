@@ -1,4 +1,4 @@
-Active Preference Learning
+Active Preference Learning (https://arxiv.org/abs/2402.08114)
 --------------------------
 
 * Code in ./direct
